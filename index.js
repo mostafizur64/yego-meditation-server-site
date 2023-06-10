@@ -43,7 +43,7 @@ const verifyJWT = (req, res, next) => {
 
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.sat5t4p.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -64,136 +64,176 @@ async function run() {
     // database collention 
     const userCollections = client.db('yogaMeditation').collection('users');
     const classCollections = client.db('yogaMeditation').collection('addClass');
+    const bookedClassCollections = client.db('yogaMeditation').collection('bookedClass');
 
 
 
     // jwt token 
-    app.post('/jwt',(req,res)=>{
-        const user = req.body;
-        const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET,{expiresIn:'1h'})
-        console.log(token,user);
-        res.send({token});
+    app.post('/jwt', (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+      res.send({ token });
     })
 
-    app.post('/users',async(req,res)=>{
-        const user =req.body;
-        const query = {email:user.email}
-        const {password} =req.body;
-        const existingUser = await userCollections.findOne(query);
-        if(existingUser){  
-            return res.send({message: 'user Already Exist!'})
-        }
-        if (password !== req.body.confirmPassword) {
-            return res.status(400).json({ message: 'Passwords do not match' });
-          }
-        
-        const result = await userCollections.insertOne(user)
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email }
+      const { password } = req.body;
+      const existingUser = await userCollections.findOne(query);
+      if (existingUser) {
+        return res.send({ message: 'user Already Exist!' })
+      }
+      if (password !== req.body.confirmPassword) {
+        return res.status(400).json({ message: 'Passwords do not match' });
+      }
+
+      const result = await userCollections.insertOne(user)
     })
 
-    app.get('/users/admin/:email',verifyJWT, async(req,res)=>{
-        const email = req.params.email;
-        if(req.decoded.email !== email){
-          res.send({admin:false})
-        }
-        const query = {email : email}
-        const user = await userCollections.findOne(query);
-        const result = {admin:user?.role === 'admin'}
-        res.send(result);
-        
+    app.get('/users/admin/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      if (req.decoded.email !== email) {
+        res.send({ admin: false })
+      }
+      const query = { email: email }
+      const user = await userCollections.findOne(query);
+      const result = { admin: user?.role === 'admin' }
+      res.send(result);
+
     });
-    app.get('/users/instructor/:email',verifyJWT, async(req,res)=>{
-        const email = req.params.email;
-        if(req.decoded.email !== email){
-          res.send({admin:false})
-        }
-        const query = {email : email}
-        const user = await userCollections.findOne(query);
-        const result = {instructor:user?.role === 'instructor'}
-        res.send(result);
-        
+
+    app.get('/users/instructor/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      if (req.decoded.email !== email) {
+        res.send({ admin: false })
+      }
+      const query = { email: email }
+      const user = await userCollections.findOne(query);
+      const result = { instructor: user?.role === 'instructor' }
+      res.send(result);
+
     });
-     
+
+    app.get('/users-findUser/:email',async(req,res)=>{
+      const email = req.params.email;
+      const query = {email: email}
+      const result = await userCollections.findOne(query);
+      res.send(result);
+    })
+
+    // status update api 
+    app.patch('/class-statusChange/:id',async(req,res)=>{
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const updateDoc = {
+        $set:{
+          status:'approved'
+        }
+      }
+      const result = await classCollections.updateOne(filter,updateDoc);
+      res.send(result);
+    })
+
+    //all user fetch for admin 
+    app.get('/allUser', async (req, res) => {
+      const result = await userCollections.find().toArray()
+      res.send(result);
+    });
+
+    //make admin 
+    app.patch('/users/admin/:id',async(req,res)=>{
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const updateDoc = {
+        $set:{
+          role: 'admin'
+        },
+      };
+      const result = await userCollections.updateOne(filter,updateDoc);
+      res.send(result);
+    });
+
+    // make instructor 
+    app.patch('/users/instructor/:id',async(req,res)=>{
+      const id  = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const updateDoc = {
+        $set:{
+          role:'instructor',
+        },
+      };
+      const result = await userCollections.updateOne(filter,updateDoc);
+      res.send(result);
+    })
+
     // all instructor 
-    app.get('/allInstructor',async(req,res)=>{
-      const query = {role:'instructor'}
+    app.get('/allInstructor', async (req, res) => {
+      const query = { role: 'instructor' }
       const result = await userCollections.find(query).toArray()
       res.send(result);
     })
 
     // all class 
-    app.get('/allClass',async(req,res)=>{
+    app.get('/allClass', async (req, res) => {
       const result = await classCollections.find().toArray();
       res.send(result);
 
     })
 
-
     //Class item  apis
-    app.post('/addClass',verifyJWT,async(req,res)=>{
+    app.post('/addClass', verifyJWT, async (req, res) => {
       const newItem = req.body;
       const result = await classCollections.insertOne(newItem)
       res.send(result);
     });
 
-    app.get('/allClassByInstructor', verifyJWT, async(req,res)=>{
+    app.get('/allClassByInstructor', verifyJWT, async (req, res) => {
       const email = req.query.email;
       if (!email) {
         return res.send([]);
       }
-    
+
       const decodedEmail = req.decoded.email;
-    
+
       if (email !== decodedEmail) {
         return res.status(403).send({ error: true, message: 'Forbidden access' });
       }
-      const query = { instructorEmail : email};
+      const query = { instructorEmail: email };
       const result = await classCollections.find(query).toArray();
       res.send(result);
     });
 
-    // app.get('/allClass', verifyJWT, async (req, res) => {
-    //   const email = req.query.email;
-    
-      // if (!email) {
-      //   return res.send([]);
-      // }
-    
-      // const decodedEmail = req.decoded.email;
-    
-      // if (email !== decodedEmail) {
-      //   return res.status(403).send({ error: true, message: 'Forbidden access' });
-      // }
-    
-    //   try {
-    //     const query = { email: email };
-    //     const result = await classCollections.find(query).toArray();
-    //     console.log(result); // Log the retrieved data for debugging
-    //     res.send(result);
-    //   } catch (error) {
-    //     console.error(error);
-    //     res.status(500).send({ error: true, message: 'Internal Server Error' });
-    //   }
-    // });
-    
 
-    // cart collection apis
-    // app.get('/allClass', verifyJWT, async (req, res) => {
-    //   const email = req.query.email;
+    //class booked api 
+    app.post('/bookedClass',async(req,res)=>{
+      const item = req.body;
+      const result = await bookedClassCollections.insertOne(item);
+      res.send(result);
+    })
+    app.get('/allClassByStudent',verifyJWT,async(req,res)=>{
+      const email = req.query.email;
 
-    //   if (!email) {
-    //     res.send([]);
-    //   }
+      if (!email) {
+        return res.send([]);
+      }
 
-    //   const decodedEmail = req.decoded.email;
-    //   if (email !== decodedEmail) {
-    //     return res.status(403).send({ error: true, message: 'Forbidden access' })
-    //   }
+      const decodedEmail = req.decoded.email;
 
-    //   const query = { email: email };
-    //   const result = await classCollections.find(query).toArray();
-    //   res.send(result);
-    // });
-
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: 'Forbidden access' });
+      }
+      const query = {studentEmail:email};
+      const result = await bookedClassCollections.find(query).toArray();
+      res.send(result);
+    });
+    // delete the student booked class 
+    app.delete('/bookedClass/:id',async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await bookedClassCollections.deleteOne(query);
+      res.send(result);
+    })
+      
 
 
     // Send a ping to confirm a successful connection
@@ -208,9 +248,9 @@ run().catch(console.dir);
 
 
 
-app.get('/',(req,res)=>{
-    res.send('yoga is Running')
+app.get('/', (req, res) => {
+  res.send('yoga is Running')
 })
-app.listen(port,()=>{
-    console.log(`Yoga meditation is on port ${port}`);
+app.listen(port, () => {
+  console.log(`Yoga meditation is on port ${port}`);
 })
