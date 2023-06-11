@@ -3,7 +3,7 @@ const app = express();
 const cors = require('cors');
 var jwt = require('jsonwebtoken');
 require('dotenv').config()
-
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -65,6 +65,7 @@ async function run() {
     const userCollections = client.db('yogaMeditation').collection('users');
     const classCollections = client.db('yogaMeditation').collection('addClass');
     const bookedClassCollections = client.db('yogaMeditation').collection('bookedClass');
+    const paymentsClassCollections = client.db('yogaMeditation').collection('payments');
 
 
 
@@ -114,23 +115,23 @@ async function run() {
 
     });
 
-    app.get('/users-findUser/:email',async(req,res)=>{
+    app.get('/users-findUser/:email', async (req, res) => {
       const email = req.params.email;
-      const query = {email: email}
+      const query = { email: email }
       const result = await userCollections.findOne(query);
       res.send(result);
     })
 
     // status update api 
-    app.patch('/class-statusChange/:id',async(req,res)=>{
+    app.patch('/class-statusChange/:id', async (req, res) => {
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)}
+      const filter = { _id: new ObjectId(id) }
       const updateDoc = {
-        $set:{
-          status:'approved'
+        $set: {
+          status: 'approved'
         }
       }
-      const result = await classCollections.updateOne(filter,updateDoc);
+      const result = await classCollections.updateOne(filter, updateDoc);
       res.send(result);
     })
 
@@ -141,28 +142,28 @@ async function run() {
     });
 
     //make admin 
-    app.patch('/users/admin/:id',async(req,res)=>{
+    app.patch('/users/admin/:id', async (req, res) => {
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)}
+      const filter = { _id: new ObjectId(id) }
       const updateDoc = {
-        $set:{
+        $set: {
           role: 'admin'
         },
       };
-      const result = await userCollections.updateOne(filter,updateDoc);
+      const result = await userCollections.updateOne(filter, updateDoc);
       res.send(result);
     });
 
     // make instructor 
-    app.patch('/users/instructor/:id',async(req,res)=>{
-      const id  = req.params.id;
-      const filter = {_id: new ObjectId(id)}
+    app.patch('/users/instructor/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
       const updateDoc = {
-        $set:{
-          role:'instructor',
+        $set: {
+          role: 'instructor',
         },
       };
-      const result = await userCollections.updateOne(filter,updateDoc);
+      const result = await userCollections.updateOne(filter, updateDoc);
       res.send(result);
     })
 
@@ -205,12 +206,12 @@ async function run() {
 
 
     //class booked api 
-    app.post('/bookedClass',async(req,res)=>{
+    app.post('/bookedClass', async (req, res) => {
       const item = req.body;
       const result = await bookedClassCollections.insertOne(item);
       res.send(result);
     })
-    app.get('/allClassByStudent',verifyJWT,async(req,res)=>{
+    app.get('/allClassByStudent', verifyJWT, async (req, res) => {
       const email = req.query.email;
 
       if (!email) {
@@ -222,18 +223,60 @@ async function run() {
       if (email !== decodedEmail) {
         return res.status(403).send({ error: true, message: 'Forbidden access' });
       }
-      const query = {studentEmail:email};
+      const query = { studentEmail: email };
       const result = await bookedClassCollections.find(query).toArray();
       res.send(result);
     });
     // delete the student booked class 
-    app.delete('/bookedClass/:id',async(req,res)=>{
+    app.delete('/bookedClass/:id', async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)};
+      const query = { _id: new ObjectId(id) };
       const result = await bookedClassCollections.deleteOne(query);
       res.send(result);
+    });
+
+    // class enrolled api 
+    app.get('/allEnrolledClassBookedByStudent', verifyJWT, async (req, res) => {
+      const email = req.query.email;
+      if (!email) {
+        return res.send([]);
+      }
+
+      const decodedEmail = req.decoded.email;
+
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: 'Forbidden access' });
+      }
+      const query = {email : email};
+      const result = await paymentsClassCollections.find(query).toArray();
+      res.send(result);
+
     })
-      
+
+    // create payment intent 
+    app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+      const { price } = req.body;
+      const amount = price * 100
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    });
+
+    // payment related api 
+    app.post('/payments', verifyJWT, async (req, res) => {
+      const payment = req.body;
+      const insertResult = await paymentsClassCollections.insertOne(payment);
+      const query = { _id: { $in: payment.cartItems.map(id => new ObjectId(id)) } };
+      const deleteResult = await bookedClassCollections.deleteMany(query);
+
+      res.send({ insertResult, deleteResult });
+    })
+
 
 
     // Send a ping to confirm a successful connection
