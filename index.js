@@ -75,7 +75,7 @@ async function run() {
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
       res.send({ token });
     })
-
+    // user realeted api 
     app.post('/users', async (req, res) => {
       const user = req.body;
       const query = { email: user.email }
@@ -175,7 +175,8 @@ async function run() {
     })
 
     // all class 
-    app.get('/allClass', async (req, res) => {
+    app.get('/allClass/', async (req, res) => {
+      const status = req.params.status;
       const result = await classCollections.find().toArray();
       res.send(result);
 
@@ -187,6 +188,34 @@ async function run() {
       const result = await classCollections.insertOne(newItem)
       res.send(result);
     });
+
+    app.get('/singleClass/:id', async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const query = {_id: new ObjectId(id)};
+      const result = await classCollections.findOne(query);
+      res.send(result)
+
+  })
+    // update clase 
+
+    app.put('/updateClass/:id',async(req,res)=>{
+      const id = req.params.id;
+      const options = { upsert: true };
+      const filter={_id:new ObjectId(id)}
+      const updateClass = req.body;
+      const classes = {
+        $set: {
+          price: updateClass.price,
+          seat: updateClass.seat,
+          className: updateClass.className,
+ 
+      }
+      }
+      const result = await classCollections.updateOne(filter, classes, options);
+      res.send(result);
+
+    })
 
     app.get('/allClassByInstructor', verifyJWT, async (req, res) => {
       const email = req.query.email;
@@ -203,7 +232,6 @@ async function run() {
       const result = await classCollections.find(query).toArray();
       res.send(result);
     });
-
 
     //class booked api 
     app.post('/bookedClass', async (req, res) => {
@@ -247,7 +275,7 @@ async function run() {
       if (email !== decodedEmail) {
         return res.status(403).send({ error: true, message: 'Forbidden access' });
       }
-      const query = {email : email};
+      const query = { email: email };
       const result = await paymentsClassCollections.find(query).toArray();
       res.send(result);
 
@@ -271,11 +299,59 @@ async function run() {
     app.post('/payments', verifyJWT, async (req, res) => {
       const payment = req.body;
       const insertResult = await paymentsClassCollections.insertOne(payment);
-      const query = { _id: { $in: payment.cartItems.map(id => new ObjectId(id)) } };
-      const deleteResult = await bookedClassCollections.deleteMany(query);
+      // const query = { _id: { $in: payment.cartItems.map(id => new ObjectId(id)) } };
+      // const deleteResult = await bookedClassCollections.deleteMany(query);
 
-      res.send({ insertResult, deleteResult });
+      res.send({ insertResult });
+    });
+
+
+    app.get('/findSingleBook/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await bookedClassCollections.findOne(query);
+      res.send(result);
+    });
+
+    app.put('/afterPaymentBooked/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: {
+          paid: 'paid',      
+        },
+      };
+      const result = await bookedClassCollections.updateOne(filter, updateDoc)
+      res.send(result);
+
     })
+
+    app.put('/sendFeedBack/:id', async (req, res) => {
+      const text = req.body;
+      const id = req.params.id;
+      console.log('id id ', req.params.id,text);
+      const filter = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: {
+          feedback: text,
+        },
+      };
+      const result = await bookedClassCollections.updateOne(filter, updateDoc)
+      res.send(result);
+
+    })
+
+    // update seat value 
+    app.put('/seatNumberIncrease/:id',async(req,res)=>{
+      const id = req.params.id;
+
+
+    })
+    // app.get('/data/:id', async (req, res) => {
+    //    res.send (await bookedClassCollections.findOne({ _id: new ObjectId(req.params.id) }))
+    //   console.log(req.params.id);
+    // })
+
 
 
 
