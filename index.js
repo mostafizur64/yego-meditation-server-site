@@ -239,7 +239,6 @@ async function run() {
       res.send(result);
 
     })
-
     app.get('/allClassByInstructor', verifyJWT, async (req, res) => {
       const email = req.query.email;
       if (!email) {
