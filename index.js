@@ -234,7 +234,7 @@ async function run() {
       const result = await classCollections.updateOne(filter, classes, options);
       res.send(result);
     })
-    
+
     app.get('/allClassByInstructor', verifyJWT, async (req, res) => {
       const email = req.query.email;
       if (!email) {
@@ -259,7 +259,6 @@ async function run() {
     })
     app.get('/allClassByStudent', verifyJWT, async (req, res) => {
       const email = req.query.email;
-
       if (!email) {
         return res.send([]);
       }
