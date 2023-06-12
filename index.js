@@ -203,7 +203,6 @@ async function run() {
       res.send(result);
 
     })
-
     //Class item  apis
     app.post('/addClass', verifyJWT, async (req, res) => {
       const newItem = req.body;
