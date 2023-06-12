@@ -216,7 +216,6 @@ async function run() {
       const query = {_id: new ObjectId(id)};
       const result = await classCollections.findOne(query);
       res.send(result)
-
   })
     // update clase 
 
