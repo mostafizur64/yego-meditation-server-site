@@ -280,7 +280,7 @@ async function run() {
       res.send(result);
     });
 
-    
+
     // class enrolled api 
     app.get('/allEnrolledClassBookedByStudent', verifyJWT, async (req, res) => {
       const email = req.query.email;
@@ -301,7 +301,6 @@ async function run() {
     // total enrolled student 
     app.get('/totalEnrolledStudent',async(req,res)=>{
       const email = req.query.email;
-     
       const query = { instructorEmail: email };
       const result = await paymentsClassCollections.find(query).toArray();
       res.send(result);
