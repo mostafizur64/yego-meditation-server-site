@@ -307,7 +307,7 @@ async function run() {
     })
 
 
-    
+
     // create payment intent 
     app.post('/create-payment-intent', verifyJWT, async (req, res) => {
       const { price } = req.body;
@@ -331,7 +331,6 @@ async function run() {
 
       res.send({ insertResult });
     });
-
     // payment histroy api 
     app.get('payment/history',async(req,res)=>{
       const email = req.query.email;
