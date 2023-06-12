@@ -196,7 +196,6 @@ async function run() {
       const result = await userCollections.find(query).toArray()
       res.send(result);
     })
-
     // all class 
     app.get('/allClass/', async (req, res) => {
       const status = req.params.status;
