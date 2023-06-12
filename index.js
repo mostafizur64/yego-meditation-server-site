@@ -229,7 +229,6 @@ async function run() {
           price: updateClass.price,
           seat: updateClass.seat,
           className: updateClass.className,
- 
       }
       }
       const result = await classCollections.updateOne(filter, classes, options);
