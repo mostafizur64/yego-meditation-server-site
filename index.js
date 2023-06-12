@@ -75,6 +75,17 @@ async function run() {
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
       res.send({ token });
     })
+
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollections.findOne(query);
+      if (user?.role !== 'admin') {
+        return res.status(403).send({ error: true, message: 'forbidden message' });
+      }
+      next();
+    }
+
     // user realeted api 
     app.post('/users', async (req, res) => {
       const user = req.body;
@@ -135,8 +146,20 @@ async function run() {
       res.send(result);
     })
 
+    app.patch('/class-statusDenied/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: {
+          status: 'denied'
+        }
+      }
+      const result = await classCollections.updateOne(filter, updateDoc);
+      res.send(result);
+    })
+
     //all user fetch for admin 
-    app.get('/allUser', async (req, res) => {
+    app.get('/allUser',verifyJWT, async (req, res) => {
       const result = await userCollections.find().toArray()
       res.send(result);
     });
@@ -279,6 +302,14 @@ async function run() {
       const result = await paymentsClassCollections.find(query).toArray();
       res.send(result);
 
+    });
+    // total enrolled student 
+    app.get('/totalEnrolledStudent',async(req,res)=>{
+      const email = req.query.email;
+     
+      const query = { instructorEmail: email };
+      const result = await paymentsClassCollections.find(query).toArray();
+      res.send(result);
     })
 
     // create payment intent 
@@ -305,6 +336,23 @@ async function run() {
       res.send({ insertResult });
     });
 
+    // payment histroy api 
+    app.get('payment/history',async(req,res)=>{
+      const email = req.query.email;
+      if (!email) {
+        return res.send([]);
+      }
+
+      const decodedEmail = req.decoded.email;
+
+      if (email !== decodedEmail) {
+        return res.status(403).send({ error: true, message: 'Forbidden access' });
+      }
+      const query = { email: email };
+      const result = await paymentsClassCollections.find(query).toArray();
+      res.send(result);
+    })
+
 
     app.get('/findSingleBook/:id', async (req, res) => {
       const id = req.params.id;
@@ -327,31 +375,46 @@ async function run() {
     })
 
     app.put('/sendFeedBack/:id', async (req, res) => {
-      const text = req.body;
+      const { feedback } = req.body;
       const id = req.params.id;
-      console.log('id id ', req.params.id,text);
-      const filter = { _id: new ObjectId(id) }
+      console.log('id id ', req.params.id, feedback);
+      const filter = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
-          feedback: text,
+          feedback: feedback,
         },
       };
-      const result = await bookedClassCollections.updateOne(filter, updateDoc)
+      const result = await classCollections.updateOne(filter, updateDoc);
       res.send(result);
+    });
+    
 
-    })
+
 
     // update seat value 
     app.put('/seatNumberIncrease/:id',async(req,res)=>{
       const id = req.params.id;
-
+      const filter = { _id: new ObjectId(id) }
+      const updateDoc = {
+        $set: {
+          seat: 'instructor',
+        },
+      };
 
     })
-    // app.get('/data/:id', async (req, res) => {
-    //    res.send (await bookedClassCollections.findOne({ _id: new ObjectId(req.params.id) }))
-    //   console.log(req.params.id);
-    // })
-
+    
+    // show popular class 
+    app.get('/showPopularClass',async(req,res)=>{
+      const query = {paid:'paid'};
+      const result = await bookedClassCollections.find(query).toArray();
+      res.send(result)
+    })
+    // show popular instructor 
+    app.get('/showPopularInstructor',async(req,res)=>{
+      const query = {paid:'paid'};
+      const result = await bookedClassCollections.find(query).toArray();
+      res.send(result)
+    })
 
 
 
