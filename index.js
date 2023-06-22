@@ -3,6 +3,8 @@ const app = express();
 const cors = require('cors');
 var jwt = require('jsonwebtoken');
 require('dotenv').config()
+const nodemailer = require("nodemailer")
+const mg = require('nodemailer-mailgun-transport');
 const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
@@ -24,6 +26,45 @@ app.use(express.json());
 //     next();
 //   })
 // }
+const auth = {
+  auth: {
+    api_key: process.env.PAYMENT_PRIVATE_API,
+    domain: process.env.EMAIL_PAYMENT_DOMAIN,
+  }
+}
+
+const transporter = nodemailer.createTransport(mg(auth));
+
+
+// let transporter = nodemailer.createTransport({
+//   host: 'smtp.sendgrid.net',
+//   port: 587,
+//   auth: {
+//       user: "apikey",
+//       pass: process.env.SENDGRID_API_KEY
+//   }
+// })
+const sendPaymentConfirmationEmail = payment =>{
+  transporter.sendMail({
+    from: "mostafizurm01@gmail.com", // verified sender email
+    to: "mostafizurm01@gmail.com", // recipient email
+    subject: "Your order is confirm have an enjoy !", // Subject line
+    text: "Hello world!", // plain text body
+    html: `<div>
+    <h2>Payment Confirmed !
+    <p>Transaction id : ${payment.transactionId}</p>
+    </h2>
+    </div>`, // html body
+  }, function(error, info){
+    if (error) {
+      console.log(error);
+    } else {
+      console.log('Email sent: ' + info.response);
+    }
+  });
+ 
+}
+
 const verifyJWT = (req, res, next) => {
   const authorization = req.headers.authorization;
   if (!authorization) {
@@ -43,7 +84,7 @@ const verifyJWT = (req, res, next) => {
 
 
 
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId, Transaction } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.sat5t4p.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -328,6 +369,10 @@ async function run() {
       const insertResult = await paymentsClassCollections.insertOne(payment);
       // const query = { _id: { $in: payment.cartItems.map(id => new ObjectId(id)) } };
       // const deleteResult = await bookedClassCollections.deleteMany(query);
+      
+      // send payment confirming email email  
+      sendPaymentConfirmationEmail(payment);
+
 
       res.send({ insertResult });
     });
